@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Scale, Upload, FileText, CheckCircle, AlertTriangle, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Scale, Upload, FileText, X, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useDocuments } from '../contexts/DocumentContext';
 
 interface EvaluationQuestion {
@@ -12,148 +11,380 @@ interface EvaluationQuestion {
   status: 'good' | 'warning' | 'critical';
 }
 
+interface Metadata {
+  template_type: string;
+  enterprise_name?: string;
+  client_name?: string;
+  effective_date?: string;
+  valid_duration?: string;
+  notice_period?: string;
+  generatedAt?: string;
+  analyzedAt?: string;
+  session_id?: string;
+  uploadedAt?: string;
+  [key: string]: any;
+}
+
+interface Document {
+  id: string;
+  name: string;
+  type: string;
+  content: string | null;
+  metadata: Metadata;
+  file: File;
+  evaluation?: EvaluationQuestion[];
+}
+
+interface UploadResponse {
+  message: string;
+  session_id: string;
+  filename: string;
+  [key: string]: any;
+}
+
+interface Template {
+  value: string;
+  label: string;
+}
+
 const ReviewContract: React.FC = () => {
-  const router = useRouter();
   const { currentDocument, addDocument, setCurrentDocument } = useDocuments();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [contractType, setContractType] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [evaluation, setEvaluation] = useState<EvaluationQuestion[]>([]);
-  const [analyzedDocument, setAnalyzedDocument] = useState<any>(null);
-
-  const contractTypes = [
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [uploadResponse, setUploadResponse] = useState<UploadResponse | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [contractTypes, setContractTypes] = useState<Template[]>([
     { value: 'msa', label: 'Master Service Agreement (MSA)' },
     { value: 'nda', label: 'Non-Disclosure Agreement (NDA)' },
     { value: 'sla', label: 'Service Level Agreement (SLA)' },
     { value: 'employment', label: 'Employment Contract' },
-    { value: 'vendor', label: 'Vendor Agreement' }
-  ];
+    { value: 'vendor', label: 'Vendor Agreement' },
+  ]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const mockEvaluations: { [key: string]: EvaluationQuestion[] } = {
-    msa: [
-      {
-        id: '1',
-        question: 'Are the service scope and deliverables clearly defined?',
-        answer: 'Yes, the contract clearly outlines all service deliverables, timelines, and acceptance criteria in Section 3.1-3.4.',
-        status: 'good'
-      },
-      {
-        id: '2',
-        question: 'Is there adequate intellectual property protection?',
-        answer: 'Partially addressed. While IP ownership is mentioned, work-for-hire clauses could be more comprehensive.',
-        status: 'warning'
-      },
-      {
-        id: '3',
-        question: 'Are liability limitations properly structured?',
-        answer: 'Critical issue: Liability cap is set too high at 2x contract value. Industry standard is typically 1x annual fees.',
-        status: 'critical'
-      },
-      {
-        id: '4',
-        question: 'Does the contract include proper termination clauses?',
-        answer: 'Yes, termination rights are well-defined with 30-day notice period and proper wind-down procedures.',
-        status: 'good'
-      },
-      {
-        id: '5',
-        question: 'Are payment terms and conditions favorable?',
-        answer: 'Payment terms are reasonable with 30-day NET terms, but late payment penalties should be included.',
-        status: 'warning'
-      }
-    ],
-    nda: [
-      {
-        id: '1',
-        question: 'Is confidential information properly defined?',
-        answer: 'Yes, confidential information is broadly and appropriately defined in Section 1 with proper exclusions.',
-        status: 'good'
-      },
-      {
-        id: '2',
-        question: 'Are the permitted uses of confidential information clear?',
-        answer: 'The permitted uses are somewhat vague and could be more specific to avoid potential disputes.',
-        status: 'warning'
-      },
-      {
-        id: '3',
-        question: 'Is the term and duration appropriate?',
-        answer: 'Critical concern: 10-year confidentiality period is excessive for this type of business relationship.',
-        status: 'critical'
-      }
-    ],
-    sla: [
-      {
-        id: '1',
-        question: 'Are service level metrics clearly defined?',
-        answer: 'Yes, uptime requirements, response times, and performance metrics are well-documented.',
-        status: 'good'
-      },
-      {
-        id: '2',
-        question: 'Are penalties and remedies appropriate?',
-        answer: 'Service credits are reasonable but escalation procedures could be more detailed.',
-        status: 'warning'
-      }
-    ]
-  };
+  useEffect(() => {
+    fetchTemplates();
+    createSession();
+  }, []);
 
-  // Check if there's a current document from generation
   useEffect(() => {
     if (currentDocument && !selectedFile) {
+      console.log('Setting contract type from currentDocument:', currentDocument.type);
       setContractType(currentDocument.type);
       setSelectedFile(currentDocument.file || null);
+      if (currentDocument.metadata?.session_id) {
+        setSessionId(currentDocument.metadata.session_id);
+        setUploadResponse({
+          message: 'File uploaded successfully',
+          session_id: currentDocument.metadata.session_id,
+          filename: currentDocument.name,
+        });
+      }
     }
   }, [currentDocument, selectedFile]);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      // Clear current document if user uploads a new file
-      if (currentDocument) {
-        setCurrentDocument(null);
+  const fetchTemplates = async () => {
+    try {
+      const response = await fetch('/api/templates', {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch templates');
       }
+      const data = await response.json();
+      console.log('Templates response:', data);
+
+      let templatesArray: any[] = [];
+      if (Array.isArray(data)) {
+        templatesArray = data;
+      } else if (data.templates && Array.isArray(data.templates)) {
+        templatesArray = data.templates;
+      } else if (data.data && Array.isArray(data.data)) {
+        templatesArray = data.data;
+      } else {
+        console.warn('Unexpected templates response structure, using fallback contract types');
+        return;
+      }
+
+      const templates: Template[] = templatesArray.map((item: any) => ({
+        value: (item.name || item.id || item.type || '').toLowerCase(),
+        label: item.description || item.name || item.type || 'Unknown Template',
+      }));
+
+      console.log('Mapped templates:', templates);
+      setContractTypes(templates.length > 0 ? templates : contractTypes);
+    } catch (err) {
+      const error = err as Error;
+      console.error('Template fetch error:', error);
+      setError(error.message || 'Failed to load contract types, using fallback options');
     }
   };
 
-  const handleAnalyzeContract = () => {
-    if (!selectedFile || !contractType) {
-      alert('Please upload a document and select contract type');
+  const createSession = async () => {
+    try {
+      const response = await fetch('/api/session/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        const contentType = response.headers.get('Content-Type');
+        let errorMessage = 'Failed to create session';
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } else {
+          errorMessage = `${errorMessage} (Status: ${response.status} ${response.statusText})`;
+        }
+        throw new Error(errorMessage);
+      }
+      const data = await response.json();
+      if (!data.session_id) {
+        throw new Error('Session ID not returned');
+      }
+      console.log('Session created:', data.session_id);
+      setSessionId(data.session_id);
+    } catch (err) {
+      const error = err as Error;
+      console.error('Session creation error:', error);
+      setError(error.message || 'An unexpected error occurred during session creation');
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    console.log('File uploaded:', { name: file.name, type: file.type, size: file.size });
+    setSelectedFile(file);
+    setUploadResponse(null);
+    setError(null);
+    setIsUploading(true);
+
+    if (currentDocument && currentDocument.type !== contractType) {
+      console.log('Clearing currentDocument, preserving contractType:', contractType);
+      setCurrentDocument(null);
+    }
+
+    if (!sessionId) {
+      console.log('No session ID, creating new session');
+      await createSession();
+    }
+
+    if (!contractType) {
+      setError('Please select a contract type before uploading the document.');
+      setIsUploading(false);
+      return;
+    }
+
+    if (!sessionId) {
+      setError('Session could not be created. Please try again.');
+      setIsUploading(false);
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('template_type', contractType);
+      formData.append('session_id', sessionId);
+
+      console.log('Sending upload request with:', {
+        template_type: contractType,
+        session_id: sessionId,
+        file_name: file.name,
+      });
+
+      const response = await fetch('/api/contracts/upload-for-review', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const contentType = response.headers.get('Content-Type');
+      let responseData: any;
+
+      if (contentType?.includes('application/json')) {
+        responseData = await response.json();
+      } else {
+        responseData = { text: await response.text() };
+      }
+
+      console.log('Upload response:', {
+        status: response.status,
+        ok: response.ok,
+        data: responseData,
+      });
+
+      if (!response.ok) {
+        let errorMessage = responseData.error || responseData.details || 'Failed to upload document';
+        if (!contentType?.includes('application/json')) {
+          errorMessage = `Failed to upload document (Status: ${response.status} ${response.statusText})`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      if (!responseData.message) {
+        throw new Error('Unexpected response format: No message field');
+      }
+
+      setUploadResponse(responseData);
+      console.log('Upload successful, response set:', responseData);
+
+      const documentId = `upload_${Date.now()}`;
+      const tempDoc: Document = {
+        id: documentId,
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        type: contractType,
+        content: null,
+        metadata: {
+          template_type: contractType,
+          session_id: sessionId,
+          uploadedAt: new Date().toISOString(),
+        },
+        file,
+      };
+      setCurrentDocument(tempDoc);
+      addDocument(tempDoc);
+    } catch (err) {
+      const error = err as Error;
+      console.error('Upload error:', error.message);
+      setError(error.message || 'Failed to upload document. Please try again.');
+      setSelectedFile(null);
+      setUploadResponse(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleAnalyzeContract = async () => {
+    if (!selectedFile || !contractType || !sessionId) {
+      setError('Please upload a document, select a contract type, and ensure a session is active.');
+      return;
+    }
+
+    console.log('Analyzing contract, uploadResponse:', uploadResponse);
+    if (!uploadResponse) {
+      setError('Document upload not completed. Please upload the document again.');
+      return;
+    }
+
+    const validMessages = ['File uploaded successfully', 'Upload successful', 'Document uploaded'];
+    if (!validMessages.includes(uploadResponse.message)) {
+      setError(`Upload issue: ${uploadResponse.message || 'Unknown error'}. Please upload the document again.`);
       return;
     }
 
     setIsAnalyzing(true);
-    
-    // Simulate AI analysis
-    setTimeout(() => {
-      const mockEvaluation = mockEvaluations[contractType] || mockEvaluations.msa;
-      setEvaluation(mockEvaluation);
-      
-      // Create analyzed document
-      const documentId = currentDocument?.id || `analyzed_${Date.now()}`;
-      const analyzedDoc = {
-        id: documentId,
-        name: selectedFile.name.replace(/\.[^/.]+$/, ""),
-        type: contractType,
-        content: currentDocument?.content || 'Document content...',
-        metadata: {
-          ...currentDocument?.metadata,
-          analyzedAt: new Date().toISOString()
-        },
-        file: selectedFile,
-        evaluation: mockEvaluation
-      };
+    setError(null);
 
-      // addDocument(analyzedDoc);
-      // setCurrentDocument(analyzedDoc);
-      setAnalyzedDocument(analyzedDoc);
+    const maxRetries = 3;
+    let attempt = 0;
+    let evaluationData = null;
+
+    while (attempt < maxRetries) {
+      try {
+        const evaluateBody = new URLSearchParams();
+        evaluateBody.append('session_id', sessionId);
+
+        const evaluateResponse = await fetch('/api/contracts/evaluate', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: evaluateBody,
+        });
+
+        if (!evaluateResponse.ok) {
+          const contentType = evaluateResponse.headers.get('Content-Type');
+          let errorMessage = 'Failed to evaluate contract';
+          if (contentType?.includes('application/json')) {
+            const errorData = await evaluateResponse.json();
+            errorMessage = errorData.error || errorData.details || errorMessage;
+          } else {
+            errorMessage = `${errorMessage} (Status: ${evaluateResponse.status} ${evaluateResponse.statusText})`;
+          }
+          throw new Error(errorMessage);
+        }
+
+        evaluationData = await evaluateResponse.json();
+        console.log('Evaluation response:', evaluationData);
+        break;
+      } catch (err) {
+        attempt++;
+        if (attempt === maxRetries) {
+          const error = err as Error;
+          console.error('Max retries reached. Evaluation failed:', error);
+          setError('Failed to evaluate the contract after multiple attempts. Please try again or contact support.');
+          setIsAnalyzing(false);
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+
+    try {
+      if (evaluationData) {
+        const { questions, answers } = evaluationData;
+        const mappedEvaluation: EvaluationQuestion[] = questions.map((question: string, index: number) => {
+          const answer = answers[index] || 'No answer provided.';
+          let status: 'good' | 'warning' | 'critical' = 'good';
+          if (answer.includes('NA - Not Applicable') || answer.startsWith('No')) {
+            status = 'good';
+          } else if (answer.includes('partially') || answer.includes('could be')) {
+            status = 'warning';
+          } else if (answer.includes('issue') || answer.includes('excessive')) {
+            status = 'critical';
+          }
+          return {
+            id: String(index),
+            question,
+            answer,
+            status,
+          };
+        });
+
+        setEvaluation(mappedEvaluation);
+
+        const documentId = currentDocument?.id || `analyzed_${Date.now()}`;
+        const analyzedDoc: Document = {
+          id: documentId,
+          name: selectedFile.name.replace(/\.[^/.]+$/, ''),
+          type: contractType,
+          content: currentDocument?.content || null,
+          metadata: {
+            template_type: contractType,
+            session_id: sessionId,
+            ...(currentDocument?.metadata || {}),
+            analyzedAt: new Date().toISOString(),
+          },
+          file: selectedFile,
+          evaluation: mappedEvaluation,
+        };
+
+        addDocument(analyzedDoc);
+        setCurrentDocument(analyzedDoc);
+      }
+    } catch (err) {
+      const error = err as Error;
+      console.error('Evaluation processing error:', error);
+      setError(error.message || 'Failed to process the evaluation results. Please try again or contact support.');
+    } finally {
       setIsAnalyzing(false);
-    }, 3000);
+    }
   };
 
-  const handleCompareDocument = () => {
-    router.push('/compare');
+  const handleChooseFileClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -183,7 +414,6 @@ const ReviewContract: React.FC = () => {
             </div>
           </div>
 
-          {/* Show current document info if coming from generation */}
           {currentDocument && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-center space-x-2">
@@ -191,49 +421,34 @@ const ReviewContract: React.FC = () => {
                 <span className="font-medium text-blue-800">Document from Generation</span>
               </div>
               <p className="text-sm text-blue-700 mt-1">
-                Ready to analyze: {currentDocument.name} ({contractTypes.find(t => t.value === currentDocument.type)?.label})
+                Ready to analyze: {currentDocument.name} ({contractTypes.find(t => t.value === currentDocument.type)?.label || currentDocument.type})
               </p>
             </div>
           )}
 
-          <div className="grid lg:grid-cols-2 gap-8">
-            {/* Upload Section */}
-            <div>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-teal-400 transition-colors">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Upload Contract Document</h3>
-                <p className="text-gray-600 mb-4">Support for Word documents, PDFs, and text files</p>
-                <input
-                  type="file"
-                  accept=".doc,.docx,.pdf,.txt"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="bg-teal-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-teal-700 cursor-pointer transition-colors"
-                >
-                  Choose File
-                </label>
-                {selectedFile && (
-                  <div className="mt-4 p-3 bg-teal-50 border border-teal-200 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <FileText className="w-4 h-4 text-teal-600" />
-                      <span className="text-sm text-teal-800">{selectedFile.name}</span>
-                    </div>
-                  </div>
-                )}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <X className="w-5 h-5 text-red-600" />
+                <span className="text-sm text-red-700">{error}</span>
               </div>
+            </div>
+          )}
 
-              <div className="mt-6">
+          <div className="grid lg:grid-cols-2 gap-8">
+            <div>
+              <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contract Type *
+                  Contract Type <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={contractType}
-                  onChange={(e) => setContractType(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  onChange={(e) => {
+                    console.log('Contract type selected:', e.target.value);
+                    setContractType(e.target.value);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-emphasis"
+                  required
                 >
                   <option value="">Select contract type</option>
                   {contractTypes.map(type => (
@@ -244,10 +459,40 @@ const ReviewContract: React.FC = () => {
                 </select>
               </div>
 
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-teal-400 transition-colors">
+                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Upload Contract Document</h3>
+                <p className="text-gray-600 mb-3">Support for Word (.doc, .docx), PDF, and text (.txt) files</p>
+                <input
+                  type="file"
+                  accept=".doc,.docx,.pdf,.txt"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="file-upload"
+                  ref={fileInputRef}
+                />
+                <button
+                  type="button"
+                  onClick={handleChooseFileClick}
+                  disabled={isUploading}
+                  className="px-6 py-2 text-white bg-teal-600 rounded-lg font-semibold hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isUploading ? 'Uploading...' : 'Choose File'}
+                </button>
+                {selectedFile && (
+                  <div className="mt-4 p-3 bg-teal-50 border border-gray-200 rounded-md">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-teal-600" />
+                      <span className="text-sm text-teal-800 truncate">{selectedFile.name}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={handleAnalyzeContract}
-                disabled={isAnalyzing || !selectedFile || !contractType}
-                className="w-full mt-6 bg-teal-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
+                disabled={isAnalyzing || isUploading || !selectedFile || !contractType || !sessionId || !uploadResponse?.message}
+                className="w-full mt-4 py-3 px-6 text-white bg-teal-700 rounded-lg font-semibold hover:bg-teal-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 {isAnalyzing ? (
                   <>
@@ -263,44 +508,25 @@ const ReviewContract: React.FC = () => {
               </button>
             </div>
 
-            {/* Results Section */}
             <div>
               {evaluation.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Contract Evaluation Results</h3>
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                  <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                     {evaluation.map((item) => (
                       <div
                         key={item.id}
-                        className="border border-gray-200 rounded-lg p-4 bg-white"
+                        className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm"
                       >
-                        <div className="flex items-start space-x-3">
+                        <div className="flex items-start gap-3">
                           {getStatusIcon(item.status)}
                           <div className="flex-1">
-                            <h4 className="font-medium text-gray-900 mb-2">{item.question}</h4>
-                            <p className="text-sm text-gray-700">{item.answer}</p>
+                            <h4 className="font-medium text-gray-900 mb-1">{item.question}</h4>
+                            <p className="text-sm text-gray-600">{item.answer}</p>
                           </div>
                         </div>
                       </div>
                     ))}
-                  </div>
-                  
-                  <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-3">
-                      <ArrowRight className="w-5 h-5 text-purple-600" />
-                      <span className="font-medium text-purple-900">Next Step</span>
-                    </div>
-                    <p className="text-sm text-purple-700 mb-4">
-                      Ready to compare this contract with another version? Use our Contract Comparison tool 
-                      to identify changes and get detailed AI insights.
-                    </p>
-                    <button
-                      onClick={handleCompareDocument}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center space-x-2"
-                    >
-                      <ArrowRight className="w-4 h-4" />
-                      <span>Compare Document</span>
-                    </button>
                   </div>
                 </div>
               )}
@@ -308,7 +534,7 @@ const ReviewContract: React.FC = () => {
               {evaluation.length === 0 && !isAnalyzing && (
                 <div className="text-center py-12">
                   <Scale className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Ready to Analyze</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready to Analyze</h3>
                   <p className="text-gray-600">Upload a contract document and select its type to get started</p>
                 </div>
               )}

@@ -1,101 +1,61 @@
 import { NextResponse } from 'next/server';
 
-// Retrieve LDAP credentials from environment variables
-const LDAP_USERNAME = process.env.LDAP_USERNAME;
-const LDAP_PASSWORD = process.env.LDAP_PASSWORD;
-
 export async function POST(request: Request) {
+  const LDAP_USERNAME = process.env.LDAP_USERNAME;
+  const LDAP_PASSWORD = process.env.LDAP_PASSWORD;
+  const BASE_URL = 'https://demo-legal-llm-backend-1.hpc4.aganitha.ai';
+
+  if (!LDAP_USERNAME || !LDAP_PASSWORD) {
+    console.error('Missing LDAP credentials at', new Date().toISOString());
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
+
+  const auth = Buffer.from(`${LDAP_USERNAME}:${LDAP_PASSWORD}`).toString('base64');
+
   try {
-    // Parse the request body
-    const body = await request.formData();
-    const sessionId = body.get('session_id') as string;
+    const formData = await request.formData();
+    const sessionId = formData.get('session_id') as string;
 
-    console.log('Evaluate - Session ID:', sessionId);
-
-    // Validate session_id
     if (!sessionId) {
-      console.log('Error: Session ID is required');
+      console.error('Session ID is required at', new Date().toISOString());
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    // Validate LDAP credentials
-    if (!LDAP_USERNAME || !LDAP_PASSWORD) {
-      console.log('Error: LDAP credentials are missing in environment variables');
-      return NextResponse.json(
-        { error: 'LDAP credentials are missing in environment variables' },
-        { status: 500 }
-      );
-    }
+    const evaluateBody = new URLSearchParams();
+    evaluateBody.append('session_id', sessionId);
 
-    // Prepare Basic Auth header: Base64 encode "username:password"
-    const authString = `${LDAP_USERNAME}:${LDAP_PASSWORD}`;
-    const authHeader = 'Basic ' + Buffer.from(authString).toString('base64');
-    console.log('Basic Auth header prepared (redacted for security)');
+    const response = await fetch(`${BASE_URL}/api/contracts/evaluate`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: evaluateBody,
+    });
 
-    // Prepare the request body for the external API
-    const externalBody = new URLSearchParams();
-    externalBody.append('session_id', sessionId);
-    console.log('External request body:', externalBody.toString());
+    if (!response.ok) {
+      const contentType = response.headers.get('Content-Type');
+      let errorMessage = 'Failed to evaluate contract';
+      let errorData: { error?: string; [key: string]: any } = {};
 
-    console.log('Sending evaluation request to external endpoint...');
-    const externalResponse = await fetch(
-      'https://demo-legal-llm-backend-1.hpc4.aganitha.ai/api/contracts/evaluate',
-      {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': authHeader,
-        },
-        body: externalBody,
-      }
-    );
-
-    console.log('External endpoint response status:', externalResponse.status);
-    const responseBody = await externalResponse.text();
-    console.log('External endpoint response body:', responseBody);
-
-    if (!externalResponse.ok) {
-      const contentType = externalResponse.headers.get('Content-Type');
-      let errorMessage = 'Failed to evaluate contract via external endpoint';
-      let errorData: { error?: string; detail?: string; [key: string]: any } = {};
-
-      if (contentType && contentType.includes('application/json')) {
-        try {
-          errorData = JSON.parse(responseBody);
-          errorMessage =
-            errorData.error || errorData.detail || 'External API returned an error with no details';
-        } catch (parseError: any) {
-          console.error('Failed to parse error response as JSON:', parseError.message);
-          errorMessage = 'Invalid error response from external API';
-        }
+      if (contentType?.includes('application/json')) {
+        errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
       } else {
-        errorMessage = `${errorMessage} (Status: ${externalResponse.status} ${externalResponse.statusText})`;
+        errorMessage = `${errorMessage} (Status: ${response.status} ${response.statusText})`;
       }
 
-      console.log('External endpoint error details:', errorData);
-      console.log('External endpoint error:', errorMessage);
-      return NextResponse.json(
-        { error: errorMessage, details: errorData },
-        { status: externalResponse.status }
-      );
+      console.error(`Evaluation failed: ${errorMessage} at ${new Date().toISOString()}`);
+      return NextResponse.json({ error: errorMessage, details: errorData }, { status: response.status });
     }
 
-    let responseData;
-    try {
-      responseData = JSON.parse(responseBody);
-    } catch (parseError: any) {
-      console.error('Failed to parse external response as JSON:', parseError.message);
-      return NextResponse.json({ error: 'Invalid response from external API' }, { status: 500 });
-    }
-
-    console.log('External endpoint parsed response:', responseData);
-    return NextResponse.json(responseData, { status: 200 });
-  } catch (error: any) {
-    console.error('Evaluation error:', error.message);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
-    );
+    const data = await response.json();
+    console.log(`Contract evaluated successfully for session ${sessionId} at ${new Date().toISOString()}`);
+    return NextResponse.json(data);
+  } catch (error) {
+    const err = error as Error;
+    console.error('Error evaluating contract:', err.message, 'at', new Date().toISOString());
+    return NextResponse.json({ error: 'Failed to evaluate contract' }, { status: 500 });
   }
 }
