@@ -32,13 +32,17 @@ interface Document {
     valid_duration: string;
     notice_period: string;
     generatedAt: string;
+    analyzedAt?: string;
+    session_id?: string;
+    uploadedAt?: string;
+    [key: string]: any;
   };
   file: File;
 }
 
 const GenerateContract = () => {
   const router = useRouter();
-  const { addDocument, setCurrentDocument } = useDocuments();
+  const { addDocument, setGenerateDocument } = useDocuments();
   const [formData, setFormData] = useState<FormData>({
     enterprise_name: '',
     client_name: '',
@@ -203,12 +207,13 @@ const GenerateContract = () => {
           valid_duration: formData.valid_duration,
           notice_period: formData.notice_period,
           generatedAt: new Date().toISOString(),
+          session_id: sessionId,
         },
         file,
       };
 
       addDocument(docObject);
-      setCurrentDocument(docObject);
+      setGenerateDocument(docObject);
       setGeneratedDocument(docObject);
 
       if (typeof window !== 'undefined') {

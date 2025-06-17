@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { GitCompare, Upload, FileText, Plus, Minus, CheckCircle, MessageSquare, ArrowRight, Download, X, Shield, Scale } from 'lucide-react';
+import { GitCompare, Upload, FileText, Plus, Minus, CheckCircle, MessageSquare, Download, X, Shield, Scale, ArrowRight } from 'lucide-react';
 import { useDocuments } from '../contexts/DocumentContext';
 
 interface Change {
@@ -24,6 +24,29 @@ interface RemarkModalProps {
   onClose: () => void;
   onSubmit: (remarks: string) => void;
   change: Change | null;
+}
+
+interface Metadata {
+  template_type: string;
+  enterprise_name: string;
+  client_name: string;
+  effective_date: string;
+  valid_duration: string;
+  notice_period: string;
+  generatedAt: string;
+  analyzedAt?: string;
+  session_id?: string;
+  uploadedAt?: string;
+  [key: string]: any;
+}
+
+interface Document {
+  id: string;
+  name: string;
+  type: string;
+  content: string | null;
+  metadata: Metadata;
+  file: File;
 }
 
 const RemarkModal: React.FC<RemarkModalProps> = ({ isOpen, onClose, onSubmit, change }) => {
@@ -77,7 +100,7 @@ const RemarkModal: React.FC<RemarkModalProps> = ({ isOpen, onClose, onSubmit, ch
 };
 
 const CompareContract: React.FC = () => {
-  const { currentDocument } = useDocuments();
+  const { compareDocument, setCompareDocument, addDocument } = useDocuments();
   const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [compareFile, setCompareFile] = useState<File | null>(null);
   const [isComparing, setIsComparing] = useState(false);
@@ -92,24 +115,21 @@ const CompareContract: React.FC = () => {
   });
 
   useEffect(() => {
-    // Create session when the component mounts
     createSession();
     fetchTemplates();
   }, []);
 
   useEffect(() => {
-    if (currentDocument && currentDocument.file && !compareFile) {
-      setCompareFile(currentDocument.file);
-      if (currentDocument.type) {
-        setSelectedTemplate(currentDocument.type);
-      }
+    if (compareDocument && !compareFile) {
+      setCompareFile(compareDocument.file);
+      setSelectedTemplate(compareDocument.type);
     }
-  }, [currentDocument, compareFile]);
+  }, [compareDocument, compareFile]);
 
   const createSession = async () => {
     try {
       console.log('Creating new session...');
-      const response = await fetch('/api/session/create', {
+      const response: globalThis.Response = await fetch('/api/session/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -139,7 +159,7 @@ const CompareContract: React.FC = () => {
   const fetchTemplates = async () => {
     try {
       console.log('Fetching templates...');
-      const response = await fetch('/api/templates', {
+      const response: globalThis.Response = await fetch('/api/templates', {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
       });
@@ -176,6 +196,29 @@ const CompareContract: React.FC = () => {
       } else {
         setCompareFile(file);
         console.log('Compare file set:', file.name);
+        if (selectedTemplate && sessionId) {
+          const documentId = `compare_${Date.now()}`;
+          const tempDoc: Document = {
+            id: documentId,
+            name: file.name.replace(/\.[^/.]+$/, ''),
+            type: selectedTemplate,
+            content: null,
+            metadata: {
+              template_type: selectedTemplate,
+              enterprise_name: '',
+              client_name: '',
+              effective_date: '',
+              valid_duration: '',
+              notice_period: '',
+              generatedAt: new Date().toISOString(),
+              session_id: sessionId,
+              uploadedAt: new Date().toISOString(),
+            },
+            file,
+          };
+          setCompareDocument(tempDoc);
+          addDocument(tempDoc);
+        }
       }
     }
   };
@@ -183,20 +226,19 @@ const CompareContract: React.FC = () => {
   const handleCompareDocuments = async () => {
     if (isComparing) {
       console.log('Comparison already in progress, ignoring duplicate click');
-      return; // Prevent multiple concurrent comparisons
+      return;
     }
 
     console.log('Starting comparison process...');
     setIsComparing(true);
     setError(null);
     console.log('Clearing changes state');
-    setChanges([]); // Clear previous changes
+    setChanges([]);
 
     let session_id = sessionId;
     let retryAttempt = false;
 
     try {
-      // Step 1: Ensure a session ID exists
       console.log('Checking session ID...');
       if (!session_id) {
         console.log('No session ID found, creating a new one...');
@@ -207,7 +249,6 @@ const CompareContract: React.FC = () => {
       }
       console.log('Session ID:', session_id);
 
-      // Validate inputs
       console.log('Validating inputs...');
       console.log('Original file:', originalFile?.name);
       console.log('Compare file:', compareFile?.name);
@@ -219,14 +260,13 @@ const CompareContract: React.FC = () => {
         throw new Error('Please select a template for the compare document');
       }
 
-      // Step 2: Upload Original Document
       console.log('Uploading original document...');
       const originalFormData = new FormData();
       originalFormData.append('file', originalFile);
       originalFormData.append('session_id', session_id);
 
       console.log('Fetching /api/contracts/upload-reference');
-      const originalResponse = await fetch('/api/contracts/upload-reference', {
+      const originalResponse: globalThis.Response = await fetch('/api/contracts/upload-reference', {
         method: 'POST',
         body: originalFormData,
       });
@@ -247,7 +287,6 @@ const CompareContract: React.FC = () => {
       const originalData = await originalResponse.json();
       console.log('Original document uploaded:', originalData);
 
-      // Step 3: Upload Compare Document
       console.log('Uploading compare document...');
       const compareFormData = new FormData();
       compareFormData.append('file', compareFile);
@@ -255,7 +294,7 @@ const CompareContract: React.FC = () => {
       compareFormData.append('session_id', session_id);
 
       console.log('Fetching /api/contracts/upload-for-review');
-      const compareResponse = await fetch('/api/contracts/upload-for-review', {
+      const compareResponse: globalThis.Response = await fetch('/api/contracts/upload-for-review', {
         method: 'POST',
         body: compareFormData,
       });
@@ -276,12 +315,11 @@ const CompareContract: React.FC = () => {
       const compareData = await compareResponse.json();
       console.log('Compare document uploaded:', compareData);
 
-      // Step 4: Compare Documents
       console.log('Comparing documents...');
       const compareBody = new URLSearchParams();
       compareBody.append('session_id', session_id);
       console.log('Fetching /api/contracts/compare');
-      const compareResultResponse = await fetch('/api/contracts/compare', {
+      const compareResultResponse: globalThis.Response = await fetch('/api/contracts/compare', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -297,12 +335,11 @@ const CompareContract: React.FC = () => {
         if (contentType && contentType.includes('application/json')) {
           const errorData = await compareResultResponse.json();
           errorMessage = errorData.error || errorMessage;
-          // Retry if the error is "Files not found for this session"
           if (errorMessage === 'Files not found for this session' && !retryAttempt) {
             console.log('Session not found, retrying with a new session');
             retryAttempt = true;
-            setSessionId(null); // Clear the old session ID
-            session_id = await createSession(); // Create a new session
+            setSessionId(null);
+            session_id = await createSession();
             throw new Error('Retry with new session');
           }
         } else {
@@ -314,7 +351,6 @@ const CompareContract: React.FC = () => {
       const compareResult = await compareResultResponse.json();
       console.log('Comparison result:', compareResult);
 
-      // Define realistic precedence and policy violation data
       const precedenceOptions = [
         "Similar extension was accepted by Microsoft in 2023 contract negotiations, but rejected by Google in 2024 due to cash flow concerns. Amazon accepted 45-day terms with 2% early payment discount in Q3 2024.",
         "Unlimited liability was rejected by Apple in 2023 and Tesla in 2024. Industry standard maintains 1-2x contract value cap. Only 3% of enterprise contracts accept unlimited liability.",
@@ -331,7 +367,6 @@ const CompareContract: React.FC = () => {
         "MAJOR VIOLATION: Conflicts with company termination policy requiring a minimum 45-day notice period. Requires legal team approval."
       ];
 
-      // Map the API response to the Change interface
       console.log('Mapping API response to changes...');
       const mappedChanges: Change[] = compareResult.differences.map((diff: any, idx: number) => {
         const type = diff.reference_text === '' ? 'addition' : diff.review_text === '' ? 'deletion' : 'modification';
@@ -339,14 +374,13 @@ const CompareContract: React.FC = () => {
         const summary = aiOpinionParts[0].replace('- Summary:', '').trim();
         const legalOpinion = aiOpinionParts[1] ? aiOpinionParts[1].trim() : 'No legal opinion provided';
 
-        // Assign realistic precedence and policy violations based on the index
         const precedence = precedenceOptions[idx % precedenceOptions.length];
         const policyViolations = policyViolationsOptions[idx % policyViolationsOptions.length];
 
         return {
           id: String(diff.index),
           type,
-          section: '', // Leave section empty as requested
+          section: '',
           index: diff.index,
           oldText: diff.reference_text || undefined,
           newText: diff.review_text || undefined,
@@ -575,18 +609,6 @@ const CompareContract: React.FC = () => {
               )}
             </select>
           </div>
-
-          {currentDocument && (
-            <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <FileText className="w-5 h-5 text-purple-600" />
-                <span className="font-medium text-purple-800">Document from Review</span>
-              </div>
-              <p className="text-sm text-purple-700 mt-1">
-                Ready to compare: {currentDocument.name} - Upload the original document to compare against
-              </p>
-            </div>
-          )}
 
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-purple-400 transition-colors">

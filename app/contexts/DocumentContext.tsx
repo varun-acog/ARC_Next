@@ -2,42 +2,73 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
+interface EvaluationQuestion {
+  id: string;
+  question: string;
+  answer: string;
+  status: 'good' | 'warning' | 'critical';
+}
+
+interface Metadata {
+  template_type: string;
+  enterprise_name: string;
+  client_name: string;
+  effective_date: string;
+  valid_duration: string;
+  notice_period: string;
+  generatedAt: string;
+  analyzedAt?: string;
+  session_id?: string;
+  uploadedAt?: string;
+  [key: string]: any;
+}
+
 interface Document {
   id: string;
   name: string;
   type: string;
   content: string | null;
-  metadata: {
-    template_type: string;
-    enterprise_name: string;
-    client_name: string;
-    effective_date: string;
-    valid_duration: string;
-    notice_period: string;
-    generatedAt: string;
-  };
+  metadata: Metadata;
   file: File;
+  evaluation?: EvaluationQuestion[];
 }
 
 interface DocumentContextType {
+  generateDocument: Document | null;
+  setGenerateDocument: (doc: Document | null) => void;
+  reviewDocument: Document | null;
+  setReviewDocument: (doc: Document | null) => void;
+  compareDocument: Document | null;
+  setCompareDocument: (doc: Document | null) => void;
   documents: Document[];
-  currentDocument: Document | null;
-  addDocument: (document: Document) => void;
-  setCurrentDocument: (document: Document | null) => void;
+  addDocument: (doc: Document) => void;
 }
 
 const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
 
-export const DocumentProvider = ({ children }: { children: ReactNode }) => {
+export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [generateDocument, setGenerateDocument] = useState<Document | null>(null);
+  const [reviewDocument, setReviewDocument] = useState<Document | null>(null);
+  const [compareDocument, setCompareDocument] = useState<Document | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
 
-  const addDocument = (document: Document) => {
-    setDocuments((prev) => [...prev, document]);
+  const addDocument = (doc: Document) => {
+    setDocuments((prev) => [...prev.filter((d) => d.id !== doc.id), doc]);
   };
 
   return (
-    <DocumentContext.Provider value={{ documents, currentDocument, addDocument, setCurrentDocument }}>
+    <DocumentContext.Provider
+      value={{
+        generateDocument,
+        setGenerateDocument,
+        reviewDocument,
+        setReviewDocument,
+        compareDocument,
+        setCompareDocument,
+        documents,
+        addDocument,
+      }}
+    >
       {children}
     </DocumentContext.Provider>
   );

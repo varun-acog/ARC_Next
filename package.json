@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "docx": "^9.5.1",
-    "lucide-react": "^0.344.0",
+    "lucide-react": "^0.516.0",
     "mammoth": "^1.9.1",
     "next": "^14.2.30",
     "node-fetch": "^3.3.2",

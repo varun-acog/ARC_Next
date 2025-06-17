@@ -12,31 +12,24 @@
       "static/chunks/fd9d1056-65da5c49987f92a0.js",
       "static/chunks/117-c5921c8ab046edab.js",
       "static/chunks/main-app-22c5c3ab1cede1ec.js",
-      "static/css/82b50a6dcf957a90.css",
+      "static/css/d430390b304d3a3b.css",
       "static/chunks/972-fc5f0fa9b3a1ca85.js",
-      "static/chunks/314-df88990347a609d1.js",
-      "static/chunks/app/layout-e06ee558f896b047.js"
-    ],
-    "/compare/page": [
-      "static/chunks/webpack-41a9ee0a1d65a3d2.js",
-      "static/chunks/fd9d1056-65da5c49987f92a0.js",
-      "static/chunks/117-c5921c8ab046edab.js",
-      "static/chunks/main-app-22c5c3ab1cede1ec.js",
-      "static/chunks/app/compare/page-2686f73d6c4f6ea4.js"
+      "static/chunks/314-f72e54c1bb6e9034.js",
+      "static/chunks/app/layout-ad9a1f29cff70be1.js"
     ],
     "/review/page": [
       "static/chunks/webpack-41a9ee0a1d65a3d2.js",
       "static/chunks/fd9d1056-65da5c49987f92a0.js",
       "static/chunks/117-c5921c8ab046edab.js",
       "static/chunks/main-app-22c5c3ab1cede1ec.js",
-      "static/chunks/app/review/page-30fc4b3e115027e7.js"
+      "static/chunks/app/review/page-d6f6cd25efabcd7f.js"
     ],
-    "/generate/page": [
+    "/compare/page": [
       "static/chunks/webpack-41a9ee0a1d65a3d2.js",
       "static/chunks/fd9d1056-65da5c49987f92a0.js",
       "static/chunks/117-c5921c8ab046edab.js",
       "static/chunks/main-app-22c5c3ab1cede1ec.js",
-      "static/chunks/app/generate/page-78113d2629e0a8bf.js"
+      "static/chunks/app/compare/page-05c832e95c68362b.js"
     ],
     "/page": [
       "static/chunks/webpack-41a9ee0a1d65a3d2.js",
@@ -45,6 +38,13 @@
       "static/chunks/main-app-22c5c3ab1cede1ec.js",
       "static/chunks/972-fc5f0fa9b3a1ca85.js",
       "static/chunks/app/page-47c117718048a4aa.js"
+    ],
+    "/generate/page": [
+      "static/chunks/webpack-41a9ee0a1d65a3d2.js",
+      "static/chunks/fd9d1056-65da5c49987f92a0.js",
+      "static/chunks/117-c5921c8ab046edab.js",
+      "static/chunks/main-app-22c5c3ab1cede1ec.js",
+      "static/chunks/app/generate/page-951f670ef0327ea9.js"
     ]
   }
 }

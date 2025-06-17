@@ -48,7 +48,7 @@ interface Template {
 }
 
 const ReviewContract: React.FC = () => {
-  const { currentDocument, addDocument, setCurrentDocument } = useDocuments();
+  const { reviewDocument, setReviewDocument, addDocument } = useDocuments();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [contractType, setContractType] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -72,21 +72,21 @@ const ReviewContract: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (currentDocument && !selectedFile) {
-      console.log('Setting contract type from currentDocument:', currentDocument.type);
-      setContractType(currentDocument.type);
-      setSelectedFile(currentDocument.file || null);
-      const metadata = currentDocument.metadata as Metadata;
+    if (reviewDocument && !selectedFile) {
+      console.log('Setting contract type from reviewDocument:', reviewDocument.type);
+      setContractType(reviewDocument.type);
+      setSelectedFile(reviewDocument.file || null);
+      const metadata = reviewDocument.metadata as Metadata;
       if (metadata?.session_id) {
         setSessionId(metadata.session_id);
         setUploadResponse({
           message: 'File uploaded successfully',
           session_id: metadata.session_id,
-          filename: currentDocument.name,
+          filename: reviewDocument.name,
         });
       }
     }
-  }, [currentDocument, selectedFile]);
+  }, [reviewDocument, selectedFile]);
 
   const fetchTemplates = async () => {
     try {
@@ -169,9 +169,9 @@ const ReviewContract: React.FC = () => {
     setError(null);
     setIsUploading(true);
 
-    if (currentDocument && currentDocument.type !== contractType) {
-      console.log('Clearing currentDocument, preserving contractType:', contractType);
-      setCurrentDocument(null);
+    if (reviewDocument && reviewDocument.type !== contractType) {
+      console.log('Clearing reviewDocument, preserving contractType:', contractType);
+      setReviewDocument(null);
     }
 
     if (!sessionId) {
@@ -257,7 +257,7 @@ const ReviewContract: React.FC = () => {
         },
         file,
       };
-      setCurrentDocument(tempDoc);
+      setReviewDocument(tempDoc);
       addDocument(tempDoc);
     } catch (err) {
       const error = err as Error;
@@ -360,20 +360,20 @@ const ReviewContract: React.FC = () => {
 
         setEvaluation(mappedEvaluation);
 
-        const documentId = currentDocument?.id || `analyzed_${Date.now()}`;
+        const documentId = reviewDocument?.id || `analyzed_${Date.now()}`;
         const analyzedDoc: Document = {
           id: documentId,
           name: selectedFile.name.replace(/\.[^/.]+$/, ''),
           type: contractType,
-          content: currentDocument?.content || null,
+          content: reviewDocument?.content || null,
           metadata: {
             template_type: contractType,
-            enterprise_name: currentDocument?.metadata.enterprise_name || '',
-            client_name: currentDocument?.metadata.client_name || '',
-            effective_date: currentDocument?.metadata.effective_date || '',
-            valid_duration: currentDocument?.metadata.valid_duration || '',
-            notice_period: currentDocument?.metadata.notice_period || '',
-            generatedAt: currentDocument?.metadata.generatedAt || new Date().toISOString(),
+            enterprise_name: reviewDocument?.metadata.enterprise_name || '',
+            client_name: reviewDocument?.metadata.client_name || '',
+            effective_date: reviewDocument?.metadata.effective_date || '',
+            valid_duration: reviewDocument?.metadata.valid_duration || '',
+            notice_period: reviewDocument?.metadata.notice_period || '',
+            generatedAt: reviewDocument?.metadata.generatedAt || new Date().toISOString(),
             session_id: sessionId,
             analyzedAt: new Date().toISOString(),
           },
@@ -382,7 +382,7 @@ const ReviewContract: React.FC = () => {
         };
 
         addDocument(analyzedDoc);
-        setCurrentDocument(analyzedDoc);
+        setReviewDocument(analyzedDoc);
       }
     } catch (err) {
       const error = err as Error;
@@ -426,14 +426,14 @@ const ReviewContract: React.FC = () => {
             </div>
           </div>
 
-          {currentDocument && (
+          {reviewDocument && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-center space-x-2">
                 <FileText className="w-5 h-5 text-blue-600" />
                 <span className="font-medium text-blue-800">Document from Generation</span>
               </div>
               <p className="text-sm text-blue-700 mt-1">
-                Ready to analyze: {currentDocument.name} ({contractTypes.find(t => t.value === currentDocument.type)?.label || currentDocument.type})
+                Ready to analyze: {reviewDocument.name} ({contractTypes.find(t => t.value === reviewDocument.type)?.label || reviewDocument.type})
               </p>
             </div>
           )}
