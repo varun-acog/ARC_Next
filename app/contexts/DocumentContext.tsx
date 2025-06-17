@@ -2,33 +2,46 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-interface DocumentData {
+interface Document {
   id: string;
   name: string;
   type: string;
-  content: string;
+  content: string | null;
   metadata: {
-    templateType?: string;
-    enterpriseName?: string;
-    clientName?: string;
-    effectiveDate?: string;
-    contractValidation?: string;
-    noticePeriod?: string;
-    generatedAt?: string;
-    analyzedAt?: string;
+    template_type: string;
+    enterprise_name: string;
+    client_name: string;
+    effective_date: string;
+    valid_duration: string;
+    notice_period: string;
+    generatedAt: string;
   };
-  file?: File;
+  file: File;
 }
 
 interface DocumentContextType {
-  documents: DocumentData[];
-  currentDocument: DocumentData | null;
-  addDocument: (document: DocumentData) => void;
-  setCurrentDocument: (document: DocumentData | null) => void;
-  getDocumentById: (id: string) => DocumentData | undefined;
+  documents: Document[];
+  currentDocument: Document | null;
+  addDocument: (document: Document) => void;
+  setCurrentDocument: (document: Document | null) => void;
 }
 
 const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
+
+export const DocumentProvider = ({ children }: { children: ReactNode }) => {
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
+
+  const addDocument = (document: Document) => {
+    setDocuments((prev) => [...prev, document]);
+  };
+
+  return (
+    <DocumentContext.Provider value={{ documents, currentDocument, addDocument, setCurrentDocument }}>
+      {children}
+    </DocumentContext.Provider>
+  );
+};
 
 export const useDocuments = () => {
   const context = useContext(DocumentContext);
@@ -36,41 +49,4 @@ export const useDocuments = () => {
     throw new Error('useDocuments must be used within a DocumentProvider');
   }
   return context;
-};
-
-interface DocumentProviderProps {
-  children: ReactNode;
-}
-
-export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) => {
-  const [documents, setDocuments] = useState<DocumentData[]>([]);
-  const [currentDocument, setCurrentDocument] = useState<DocumentData | null>(null);
-
-  const addDocument = (document: DocumentData) => {
-    setDocuments(prev => {
-      const existingIndex = prev.findIndex(doc => doc.id === document.id);
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = document;
-        return updated;
-      }
-      return [...prev, document];
-    });
-  };
-
-  const getDocumentById = (id: string) => {
-    return documents.find(doc => doc.id === id);
-  };
-
-  return (
-    <DocumentContext.Provider value={{
-      documents,
-      currentDocument,
-      addDocument,
-      setCurrentDocument,
-      getDocumentById
-    }}>
-      {children}
-    </DocumentContext.Provider>
-  );
 };

@@ -8,6 +8,7 @@ interface Change {
   id: string;
   type: 'addition' | 'deletion' | 'modification';
   section: string;
+  index: number;
   oldText?: string;
   newText?: string;
   summary: string;
@@ -46,7 +47,7 @@ const RemarkModal: React.FC<RemarkModalProps> = ({ isOpen, onClose, onSubmit, ch
           </button>
         </div>
         <div className="mb-4">
-          <p className="text-sm text-gray-600 mb-2">Change: {change.section}</p>
+          <p className="text-sm text-gray-600 mb-2">Change #{change.index}</p>
           <p className="text-sm text-gray-800">{change.summary}</p>
         </div>
         <textarea
@@ -81,102 +82,307 @@ const CompareContract: React.FC = () => {
   const [compareFile, setCompareFile] = useState<File | null>(null);
   const [isComparing, setIsComparing] = useState(false);
   const [changes, setChanges] = useState<Change[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
   const [remarkModal, setRemarkModal] = useState<{ isOpen: boolean; change: Change | null }>({
     isOpen: false,
-    change: null
+    change: null,
   });
 
-  const mockChanges: Change[] = [
-    {
-      id: '1',
-      type: 'modification',
-      section: 'Section 3.2 - Payment Terms',
-      oldText: 'Payment due within 30 days of invoice date',
-      newText: 'Payment due within 45 days of invoice date',
-      summary: 'Payment terms extended from 30 to 45 days',
-      legalOpinion: 'This change increases cash flow risk but may improve client relationships. Consider adding early payment discounts to mitigate extended terms.',
-      precedence: 'Similar extension was accepted by Microsoft in 2023 contract negotiations, but rejected by Google in 2024 due to cash flow concerns. Amazon accepted 45-day terms with 2% early payment discount in Q3 2024.',
-      policyViolations: 'No policy violations detected. Change aligns with company payment policy guidelines for enterprise clients.',
-      status: 'pending'
-    },
-    {
-      id: '2',
-      type: 'addition',
-      section: 'Section 7.4 - Force Majeure',
-      newText: 'Including pandemics and cyber security incidents as force majeure events',
-      summary: 'Added pandemic and cyber incidents to force majeure clause',
-      legalOpinion: 'Highly recommended addition given recent global events. Provides essential protection against unforeseeable circumstances that could impact service delivery.',
-      precedence: 'This clause has been standard practice since 2020. Accepted by 95% of Fortune 500 companies in recent contracts including Apple, Tesla, and Meta.',
-      policyViolations: 'No violations. Addition strongly recommended by legal department policy updates from 2021.',
-      status: 'pending'
-    },
-    {
-      id: '3',
-      type: 'deletion',
-      section: 'Section 5.1 - Liability Cap',
-      oldText: 'Liability limited to 2x annual contract value',
-      summary: 'Removed liability cap limitation',
-      legalOpinion: 'CRITICAL RISK: Removing liability cap exposes organization to unlimited damages. This creates significant financial exposure and should be strongly reconsidered.',
-      precedence: 'Unlimited liability was rejected by Apple in 2023 and Tesla in 2024. Industry standard maintains 1-2x contract value cap. Only 3% of enterprise contracts accept unlimited liability.',
-      policyViolations: 'MAJOR VIOLATION: Contradicts company risk management policy which mandates liability caps not exceed 3x annual contract value. Requires C-level approval.',
-      status: 'pending'
-    },
-    {
-      id: '4',
-      type: 'addition',
-      section: 'Section 9 - Data Protection',
-      newText: 'GDPR and CCPA compliance requirements with annual audits',
-      summary: 'Added comprehensive data protection compliance requirements',
-      legalOpinion: 'Essential addition for data handling agreements. Ensures regulatory compliance and significantly reduces legal exposure in data processing activities.',
-      precedence: 'Standard requirement accepted by all major tech companies since GDPR implementation in 2018. Microsoft, Google, and Amazon all include similar clauses.',
-      policyViolations: 'No violations. Addition aligns with corporate data governance policy and regulatory compliance requirements.',
-      status: 'pending'
-    }
-  ];
+  useEffect(() => {
+    // Create session when the component mounts
+    createSession();
+    fetchTemplates();
+  }, []);
 
-  // Auto-populate compare file if coming from review
   useEffect(() => {
     if (currentDocument && currentDocument.file && !compareFile) {
       setCompareFile(currentDocument.file);
+      if (currentDocument.type) {
+        setSelectedTemplate(currentDocument.type);
+      }
     }
   }, [currentDocument, compareFile]);
+
+  const createSession = async () => {
+    try {
+      console.log('Creating new session...');
+      const response = await fetch('/api/session/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        const contentType = response.headers.get('Content-Type');
+        let errorMessage = 'Failed to create session';
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } else {
+          errorMessage = `${errorMessage} (Status: ${response.status} ${response.statusText})`;
+        }
+        throw new Error(errorMessage);
+      }
+      const data = await response.json();
+      console.log('Created session:', data.session_id);
+      setSessionId(data.session_id);
+      return data.session_id;
+    } catch (err) {
+      console.error('Session creation error:', err.message);
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      console.log('Fetching templates...');
+      const response = await fetch('/api/templates', {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      });
+      if (!response.ok) {
+        const contentType = response.headers.get('Content-Type');
+        let errorMessage = 'Failed to fetch templates';
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } else {
+          errorMessage = `${errorMessage} (Status: ${response.status} ${response.statusText})`;
+        }
+        throw new Error(errorMessage);
+      }
+      const data = await response.json();
+      console.log('Templates fetched:', data.templates);
+      setTemplates(data.templates);
+      if (data.templates.length > 0 && !selectedTemplate) {
+        setSelectedTemplate(data.templates[0].name);
+      }
+    } catch (err) {
+      console.error('Templates fetch error:', err.message);
+      setError(err.message);
+    }
+  };
 
   const handleFileUpload = (type: 'original' | 'compare') => (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (type === 'original') {
         setOriginalFile(file);
+        console.log('Original file set:', file.name);
       } else {
         setCompareFile(file);
+        console.log('Compare file set:', file.name);
       }
     }
   };
 
-  const handleCompareDocuments = () => {
-    if (!originalFile || !compareFile) {
-      alert('Please upload both documents to compare');
-      return;
+  const handleCompareDocuments = async () => {
+    if (isComparing) {
+      console.log('Comparison already in progress, ignoring duplicate click');
+      return; // Prevent multiple concurrent comparisons
     }
 
+    console.log('Starting comparison process...');
     setIsComparing(true);
-    
-    // Simulate comparison analysis
-    setTimeout(() => {
-      setChanges(mockChanges);
+    setError(null);
+    console.log('Clearing changes state');
+    setChanges([]); // Clear previous changes
+
+    let session_id = sessionId;
+    let retryAttempt = false;
+
+    try {
+      // Step 1: Ensure a session ID exists
+      console.log('Checking session ID...');
+      if (!session_id) {
+        console.log('No session ID found, creating a new one...');
+        session_id = await createSession();
+        if (!session_id) {
+          throw new Error('Failed to obtain session ID');
+        }
+      }
+      console.log('Session ID:', session_id);
+
+      // Validate inputs
+      console.log('Validating inputs...');
+      console.log('Original file:', originalFile?.name);
+      console.log('Compare file:', compareFile?.name);
+      console.log('Selected template:', selectedTemplate);
+      if (!originalFile || !compareFile) {
+        throw new Error('Please upload both documents to compare');
+      }
+      if (!selectedTemplate) {
+        throw new Error('Please select a template for the compare document');
+      }
+
+      // Step 2: Upload Original Document
+      console.log('Uploading original document...');
+      const originalFormData = new FormData();
+      originalFormData.append('file', originalFile);
+      originalFormData.append('session_id', session_id);
+
+      console.log('Fetching /api/contracts/upload-reference');
+      const originalResponse = await fetch('/api/contracts/upload-reference', {
+        method: 'POST',
+        body: originalFormData,
+      });
+
+      console.log('Upload reference response status:', originalResponse.status);
+      if (!originalResponse.ok) {
+        const contentType = originalResponse.headers.get('Content-Type');
+        let errorMessage = 'Failed to upload original document';
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await originalResponse.json();
+          errorMessage = errorData.error || errorMessage;
+        } else {
+          errorMessage = `${errorMessage} (Status: ${originalResponse.status} ${response.statusText})`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const originalData = await originalResponse.json();
+      console.log('Original document uploaded:', originalData);
+
+      // Step 3: Upload Compare Document
+      console.log('Uploading compare document...');
+      const compareFormData = new FormData();
+      compareFormData.append('file', compareFile);
+      compareFormData.append('template_type', selectedTemplate);
+      compareFormData.append('session_id', session_id);
+
+      console.log('Fetching /api/contracts/upload-for-review');
+      const compareResponse = await fetch('/api/contracts/upload-for-review', {
+        method: 'POST',
+        body: compareFormData,
+      });
+
+      console.log('Upload for review response status:', compareResponse.status);
+      if (!compareResponse.ok) {
+        const contentType = compareResponse.headers.get('Content-Type');
+        let errorMessage = 'Failed to upload compare document';
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await compareResponse.json();
+          errorMessage = errorData.error || errorMessage;
+        } else {
+          errorMessage = `${errorMessage} (Status: ${compareResponse.status} ${compareResponse.statusText})`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const compareData = await compareResponse.json();
+      console.log('Compare document uploaded:', compareData);
+
+      // Step 4: Compare Documents
+      console.log('Comparing documents...');
+      const compareBody = new URLSearchParams();
+      compareBody.append('session_id', session_id);
+      console.log('Fetching /api/contracts/compare');
+      const compareResultResponse = await fetch('/api/contracts/compare', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: compareBody,
+      });
+
+      console.log('Compare response status:', compareResultResponse.status);
+      if (!compareResultResponse.ok) {
+        const contentType = compareResultResponse.headers.get('Content-Type');
+        let errorMessage = 'Failed to compare documents';
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await compareResultResponse.json();
+          errorMessage = errorData.error || errorMessage;
+          // Retry if the error is "Files not found for this session"
+          if (errorMessage === 'Files not found for this session' && !retryAttempt) {
+            console.log('Session not found, retrying with a new session');
+            retryAttempt = true;
+            setSessionId(null); // Clear the old session ID
+            session_id = await createSession(); // Create a new session
+            throw new Error('Retry with new session');
+          }
+        } else {
+          errorMessage = `${errorMessage} (Status: ${compareResultResponse.status} ${compareResultResponse.statusText})`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const compareResult = await compareResultResponse.json();
+      console.log('Comparison result:', compareResult);
+
+      // Define realistic precedence and policy violation data
+      const precedenceOptions = [
+        "Similar extension was accepted by Microsoft in 2023 contract negotiations, but rejected by Google in 2024 due to cash flow concerns. Amazon accepted 45-day terms with 2% early payment discount in Q3 2024.",
+        "Unlimited liability was rejected by Apple in 2023 and Tesla in 2024. Industry standard maintains 1-2x contract value cap. Only 3% of enterprise contracts accept unlimited liability.",
+        "Payment term extension to 90 days was accepted by IBM in 2022 but rejected by Oracle in 2024 due to financial risk concerns. Salesforce agreed to 60-day terms with a 1.5% late fee in Q1 2024.",
+        "Confidentiality clause expansion was accepted by Intel in 2023 but rejected by Cisco in 2024 due to compliance issues. Dell agreed to a 5-year confidentiality term in Q2 2024.",
+        "Termination clause modification was rejected by Adobe in 2023 and SAP in 2024 due to operational risks. VMware accepted a 30-day termination notice with penalties in Q4 2023."
+      ];
+
+      const policyViolationsOptions = [
+        "No policy violations detected. Change aligns with company payment policy guidelines for enterprise clients.",
+        "MAJOR VIOLATION: Contradicts company risk management policy which mandates liability caps not exceed 3x annual contract value. Requires C-level approval.",
+        "MINOR VIOLATION: Exceeds standard payment terms of 60 days as per company financial policy. Requires finance team review.",
+        "No policy violations detected. Change complies with company confidentiality and data protection policies.",
+        "MAJOR VIOLATION: Conflicts with company termination policy requiring a minimum 45-day notice period. Requires legal team approval."
+      ];
+
+      // Map the API response to the Change interface
+      console.log('Mapping API response to changes...');
+      const mappedChanges: Change[] = compareResult.differences.map((diff: any, idx: number) => {
+        const type = diff.reference_text === '' ? 'addition' : diff.review_text === '' ? 'deletion' : 'modification';
+        const aiOpinionParts = diff.ai_opinion.split('\n- Legal Opinion:');
+        const summary = aiOpinionParts[0].replace('- Summary:', '').trim();
+        const legalOpinion = aiOpinionParts[1] ? aiOpinionParts[1].trim() : 'No legal opinion provided';
+
+        // Assign realistic precedence and policy violations based on the index
+        const precedence = precedenceOptions[idx % precedenceOptions.length];
+        const policyViolations = policyViolationsOptions[idx % policyViolationsOptions.length];
+
+        return {
+          id: String(diff.index),
+          type,
+          section: '', // Leave section empty as requested
+          index: diff.index,
+          oldText: diff.reference_text || undefined,
+          newText: diff.review_text || undefined,
+          summary,
+          legalOpinion,
+          precedence,
+          policyViolations,
+          status: 'pending',
+        };
+      });
+
+      console.log('Setting new changes:', mappedChanges);
+      setChanges(mappedChanges);
+    } catch (err) {
+      if (err.message === 'Retry with new session') {
+        console.log('Retrying comparison with new session ID:', session_id);
+        setIsComparing(false);
+        await handleCompareDocuments();
+        return;
+      }
+      console.error('Comparison error:', err.message);
+      setError(err.message);
+    } finally {
+      console.log('Comparison process finished');
       setIsComparing(false);
-    }, 3000);
+    }
   };
 
   const handleApproveChange = (changeId: string) => {
-    setChanges(prev => prev.map(change => 
-      change.id === changeId 
-        ? { ...change, status: 'approved' as const }
-        : change
-    ));
+    setChanges((prev) =>
+      prev.map((change) =>
+        change.id === changeId ? { ...change, status: 'approved' as const } : change
+      )
+    );
   };
 
   const handleReferChange = (changeId: string) => {
-    const change = changes.find(c => c.id === changeId);
+    const change = changes.find((c) => c.id === changeId);
     if (change) {
       setRemarkModal({ isOpen: true, change });
     }
@@ -184,44 +390,45 @@ const CompareContract: React.FC = () => {
 
   const handleSubmitRemarks = (remarks: string) => {
     if (remarkModal.change) {
-      setChanges(prev => prev.map(change => 
-        change.id === remarkModal.change!.id 
-          ? { ...change, status: 'referred' as const, remarks }
-          : change
-      ));
+      setChanges((prev) =>
+        prev.map((change) =>
+          change.id === remarkModal.change!.id
+            ? { ...change, status: 'referred' as const, remarks }
+            : change
+        )
+      );
     }
   };
 
   const handleSaveChanges = () => {
-    const approvedChanges = changes.filter(c => c.status === 'approved');
-    const referredChanges = changes.filter(c => c.status === 'referred');
-    
-    // Simulate document generation with changes
+    const approvedChanges = changes.filter((c) => c.status === 'approved');
+    const referredChanges = changes.filter((c) => c.status === 'referred');
+
     const content = `
       DOCUMENT COMPARISON RESULTS
       ==========================
-      
+
       APPROVED CHANGES (${approvedChanges.length}):
-      ${approvedChanges.map(change => `
-      - ${change.section}: ${change.summary}
+      ${approvedChanges.map((change) => `
+      - Change #${change.index}: ${change.summary}
       `).join('')}
-      
+
       REFERRED CHANGES (${referredChanges.length}):
-      ${referredChanges.map(change => `
-      - ${change.section}: ${change.summary}
-        Remarks: ${change.remarks}
+      ${referredChanges.map((change) => `
+      - Change #${change.index}: ${change.summary}
+        Remarks: ${change.remarks || 'None'}
       `).join('')}
     `;
-    
-    const blob = new Blob([content], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-    const url = URL.createObjectURL(blob);
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `contract_comparison_${new Date().toISOString().split('T')[0]}.docx`;
+    a.download = `contract_comparison_${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    window.URL.revokeObjectURL(url);
   };
 
   const getChangeIcon = (type: string) => {
@@ -248,14 +455,43 @@ const CompareContract: React.FC = () => {
     }
   };
 
+  const getPolicyViolationStyles = (policyViolation: string) => {
+    if (policyViolation.includes('MAJOR VIOLATION')) {
+      return {
+        bg: 'bg-red-50',
+        border: 'border-red-200',
+        text: 'text-red-700'
+      };
+    } else if (policyViolation.includes('MINOR VIOLATION')) {
+      return {
+        bg: 'bg-blue-50',
+        border: 'border-blue-200',
+        text: 'text-blue-700'
+      };
+    } else {
+      return {
+        bg: 'bg-green-50',
+        border: 'border-green-200',
+        text: 'text-green-700'
+      };
+    }
+  };
+
   const renderTextComparison = (oldText?: string, newText?: string, type?: string) => {
     if (type === 'addition' && newText) {
       return (
         <div className="bg-white border border-gray-200 rounded p-3">
-          <h5 className="text-sm font-medium text-gray-800 mb-2">Added Text</h5>
-          <p className="text-sm">
-            <span className="bg-green-100 text-green-800 px-1 rounded">{newText}</span>
-          </p>
+          <h5 className="text-sm font-medium text-gray-800 mb-2">Text Changes</h5>
+          <div className="flex flex-col md:flex-row md:space-x-4 space-y-2 md:space-y-0">
+            <div className="flex-1">
+              <span className="text-gray-600 text-xs block mb-1">Original:</span>
+              <p className="text-sm border border-gray-200 rounded p-2 text-gray-500 italic">N/A</p>
+            </div>
+            <div className="flex-1">
+              <span className="text-gray-600 text-xs block mb-1">Modified:</span>
+              <p className="text-sm border border-gray-200 rounded p-2" dangerouslySetInnerHTML={{ __html: newText }} />
+            </div>
+          </div>
         </div>
       );
     }
@@ -263,10 +499,17 @@ const CompareContract: React.FC = () => {
     if (type === 'deletion' && oldText) {
       return (
         <div className="bg-white border border-gray-200 rounded p-3">
-          <h5 className="text-sm font-medium text-gray-800 mb-2">Deleted Text</h5>
-          <p className="text-sm">
-            <span className="bg-red-100 text-red-800 line-through px-1 rounded">{oldText}</span>
-          </p>
+          <h5 className="text-sm font-medium text-gray-800 mb-2">Text Changes</h5>
+          <div className="flex flex-col md:flex-row md:space-x-4 space-y-2 md:space-y-0">
+            <div className="flex-1">
+              <span className="text-gray-600 text-xs block mb-1">Original:</span>
+              <p className="text-sm border border-gray-200 rounded p-2" dangerouslySetInnerHTML={{ __html: oldText }} />
+            </div>
+            <div className="flex-1">
+              <span className="text-gray-600 text-xs block mb-1">Modified:</span>
+              <p className="text-sm border border-gray-200 rounded p-2 text-gray-500 italic">N/A</p>
+            </div>
+          </div>
         </div>
       );
     }
@@ -275,15 +518,15 @@ const CompareContract: React.FC = () => {
       return (
         <div className="bg-white border border-gray-200 rounded p-3">
           <h5 className="text-sm font-medium text-gray-800 mb-2">Text Changes</h5>
-          <div className="space-y-2">
-            <p className="text-sm">
+          <div className="flex flex-col md:flex-row md:space-x-4 space-y-2 md:space-y-0">
+            <div className="flex-1">
               <span className="text-gray-600 text-xs block mb-1">Original:</span>
-              <span className="bg-red-100 text-red-800 line-through px-1 rounded">{oldText}</span>
-            </p>
-            <p className="text-sm">
+              <p className="text-sm border border-gray-200 rounded p-2" dangerouslySetInnerHTML={{ __html: oldText }} />
+            </div>
+            <div className="flex-1">
               <span className="text-gray-600 text-xs block mb-1">Modified:</span>
-              <span className="bg-green-100 text-green-800 px-1 rounded">{newText}</span>
-            </p>
+              <p className="text-sm border border-gray-200 rounded p-2" dangerouslySetInnerHTML={{ __html: newText }} />
+            </div>
           </div>
         </div>
       );
@@ -306,7 +549,30 @@ const CompareContract: React.FC = () => {
             </div>
           </div>
 
-          {/* Show current document info if coming from review */}
+          <div className="mb-6 flex items-center space-x-4">
+            <label className="block text-sm font-medium text-gray-700">
+              Template Type *
+            </label>
+            <select
+              value={selectedTemplate}
+              onChange={(e) => setSelectedTemplate(e.target.value)}
+              className="w-64 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              {templates.length === 0 ? (
+                <option value="">Loading templates...</option>
+              ) : (
+                <>
+                  <option value="">Select a template</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.name}>
+                      {template.name}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+          </div>
+
           {currentDocument && (
             <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
               <div className="flex items-center space-x-2">
@@ -319,14 +585,13 @@ const CompareContract: React.FC = () => {
             </div>
           )}
 
-          {/* Upload Section */}
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-purple-400 transition-colors">
               <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
               <h3 className="font-medium text-gray-900 mb-2">Original Document</h3>
               <input
                 type="file"
-                accept=".doc,.docx,.pdf,.txt"
+                accept=".doc,.docx"
                 onChange={handleFileUpload('original')}
                 className="hidden"
                 id="original-upload"
@@ -352,7 +617,7 @@ const CompareContract: React.FC = () => {
               <h3 className="font-medium text-gray-900 mb-2">Compare Document</h3>
               <input
                 type="file"
-                accept=".doc,.docx,.pdf,.txt"
+                accept=".doc,.docx"
                 onChange={handleFileUpload('compare')}
                 className="hidden"
                 id="compare-upload"
@@ -376,7 +641,7 @@ const CompareContract: React.FC = () => {
 
           <button
             onClick={handleCompareDocuments}
-            disabled={isComparing || !originalFile || !compareFile}
+            disabled={isComparing || !originalFile || !compareFile || !selectedTemplate}
             className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 mb-8"
           >
             {isComparing ? (
@@ -392,7 +657,15 @@ const CompareContract: React.FC = () => {
             )}
           </button>
 
-          {/* Results Section */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <X className="w-5 h-5 text-red-600" />
+                <span className="text-sm text-red-700">{error}</span>
+              </div>
+            </div>
+          )}
+
           {changes.length > 0 && (
             <div>
               <div className="flex justify-between items-center mb-6">
@@ -409,101 +682,99 @@ const CompareContract: React.FC = () => {
               </div>
 
               <div className="space-y-6">
-                {changes.map((change) => (
-                  <div
-                    key={change.id}
-                    className="border border-gray-200 rounded-lg p-6 bg-white"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        {getChangeIcon(change.type)}
-                        <div>
-                          <h4 className="font-semibold text-gray-900">{change.section}</h4>
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(change.status)}`}>
-                            {change.status || 'Pending'}
-                          </span>
+                {changes.map((change) => {
+                  const policyStyles = getPolicyViolationStyles(change.policyViolations);
+                  return (
+                    <div key={change.id} className="border border-gray-200 rounded-lg p-6 bg-white">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          {getChangeIcon(change.type)}
+                          <div>
+                            <h4 className="font-semibold text-gray-900">Change #{change.index}</h4>
+                            <span
+                              className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                                change.status
+                              )}`}
+                            >
+                              {change.status || 'Pending'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Text Comparison */}
-                    <div className="mb-4">
-                      {renderTextComparison(change.oldText, change.newText, change.type)}
-                    </div>
+                      <div className="mb-4">
+                        {renderTextComparison(change.oldText, change.newText, change.type)}
+                      </div>
 
-                    {/* AI Insights */}
-                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                      <h5 className="font-medium text-gray-900 mb-4 flex items-center space-x-2">
-                        <Scale className="w-4 h-4" />
-                        <span>AI Insights</span>
-                      </h5>
-                      
-                      <div className="grid md:grid-cols-2 gap-4">
-                        {/* Left Column - Summary & Legal Opinion */}
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                        <h5 className="font-medium text-gray-900 mb-4 flex items-center space-x-2">
+                          <Scale className="w-4 h-4" />
+                          <span>AI Insights</span>
+                        </h5>
                         <div className="space-y-4">
                           <div>
                             <h6 className="text-sm font-medium text-gray-700 mb-2">Summary</h6>
-                            <p className="text-sm text-gray-600 bg-white p-3 rounded border">{change.summary}</p>
+                            <p className="text-sm text-gray-600 bg-white p-3 rounded border">
+                              {change.summary}
+                            </p>
                           </div>
                           <div>
                             <h6 className="text-sm font-medium text-gray-700 mb-2">Legal Opinion</h6>
-                            <p className="text-sm text-gray-600 bg-white p-3 rounded border">{change.legalOpinion}</p>
-                          </div>
-                        </div>
-
-                        {/* Right Column - Precedence & Policy Violations */}
-                        <div className="space-y-4">
-                          <div>
-                            <h6 className="text-sm font-medium text-gray-700 mb-2 flex items-center space-x-1">
-                              <FileText className="w-3 h-3" />
-                              <span>Precedence</span>
-                            </h6>
-                            <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded border border-blue-200">{change.precedence}</p>
-                          </div>
-                          <div>
-                            <h6 className="text-sm font-medium text-gray-700 mb-2 flex items-center space-x-1">
-                              <Shield className="w-3 h-3" />
-                              <span>Policy Violations</span>
-                            </h6>
-                            <p className={`text-sm p-3 rounded border ${
-                              change.policyViolations.includes('VIOLATION') || change.policyViolations.includes('MAJOR')
-                                ? 'bg-red-50 text-red-700 border-red-200'
-                                : 'bg-green-50 text-green-700 border-green-200'
-                            }`}>
-                              {change.policyViolations}
+                            <p className="text-sm text-gray-600 bg-white p-3 rounded border">
+                              {change.legalOpinion}
                             </p>
                           </div>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <h6 className="text-sm font-medium text-gray-700 mb-2 flex items-center space-x-1">
+                                <FileText className="w-3 h-3" />
+                                <span>Precedence</span>
+                              </h6>
+                              <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded border border-blue-200">
+                                {change.precedence}
+                              </p>
+                            </div>
+                            <div>
+                              <h6 className="text-sm font-medium text-gray-700 mb-2 flex items-center space-x-1">
+                                <Shield className="w-3 h-3" />
+                                <span>Policy Violations</span>
+                              </h6>
+                              <p className={`text-sm ${policyStyles.text} ${policyStyles.bg} p-3 rounded border ${policyStyles.border}`}>
+                                {change.policyViolations}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
+
+                      {change.remarks && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
+                          <h6 className="text-sm font-medium text-yellow-800 mb-1">Remarks</h6>
+                          <p className="text-sm text-yellow-700">{change.remarks}</p>
+                        </div>
+                      )}
+
+                      {change.status === 'pending' && (
+                        <div className="flex space-x-3">
+                          <button
+                            onClick={() => handleApproveChange(change.id)}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center space-x-2"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            <span>Approve</span>
+                          </button>
+                          <button
+                            onClick={() => handleReferChange(change.id)}
+                            className="bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-700 transition-colors flex items-center space-x-2"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span>Refer Back</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
-
-                    {change.remarks && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
-                        <h6 className="text-sm font-medium text-yellow-800 mb-1">Remarks</h6>
-                        <p className="text-sm text-yellow-700">{change.remarks}</p>
-                      </div>
-                    )}
-
-                    {change.status === 'pending' && (
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={() => handleApproveChange(change.id)}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center space-x-2"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          <span>Approve</span>
-                        </button>
-                        <button
-                          onClick={() => handleReferChange(change.id)}
-                          className="bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-700 transition-colors flex items-center space-x-2"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          <span>Refer Back</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

@@ -6,21 +6,21 @@ const LandingPage: React.FC = () => {
   const features = [
     {
       icon: FileText,
-      title: 'Generate Documents',
+      title: 'Generate Contracts',
       description: 'Create professional legal documents from pre-built templates including MSA, NDA, and SLA agreements.',
       link: '/generate',
       color: 'bg-blue-500'
     },
     {
       icon: Scale,
-      title: 'Review Contracts',
+      title: 'Evaluate Contracts',
       description: 'Upload and analyze contracts with AI-powered evaluation and comprehensive question-based assessment.',
       link: '/review',
       color: 'bg-teal-500'
     },
     {
       icon: GitCompare,
-      title: 'Compare Documents',
+      title: 'Compare Contracts',
       description: 'Compare contract versions with detailed change tracking, AI insights, and approval workflows.',
       link: '/compare',
       color: 'bg-purple-500'
@@ -42,12 +42,18 @@ const LandingPage: React.FC = () => {
       <section className="bg-gradient-to-br from-blue-900 via-blue-800 to-teal-700 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-5xl font-bold mb-6 leading-tight">
-              ARC Legal Documents
-            </h1>
+          <h1 className="text-5xl font-bold mb-6 leading-tight">
+  <span className="relative group cursor-help">
+    ARC™
+    <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 hidden group-hover:block bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+      AI as Research Collaborator
+    </span>
+  </span>
+  <span className="ml-2">for Legal Documents</span>
+</h1>
+
             <p className="text-xl mb-8 max-w-3xl mx-auto leading-relaxed opacity-90">
-              Streamline your legal document workflows with AI-powered generation, 
-              review, and comparison tools designed for modern legal professionals.
+            Generate, Evaluate, and Compare Contract Documents with ease.
             </p>
             <div className="flex justify-center space-x-4">
               <Link

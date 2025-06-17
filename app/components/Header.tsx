@@ -11,9 +11,9 @@ const Header: React.FC = () => {
 
   const navItems = [
     { path: '/', label: 'Home', icon: null },
-    { path: '/generate', label: 'Generate Document', icon: FileText },
-    { path: '/review', label: 'Review Contract', icon: Scale },
-    { path: '/compare', label: 'Compare Contract', icon: GitCompare },
+    { path: '/generate', label: 'Generate Contract', icon: FileText },
+    { path: '/review', label: 'Evaluate Contract', icon: Scale },
+    { path: '/compare', label: 'Compare Contracts', icon: GitCompare },
   ];
 
   return (

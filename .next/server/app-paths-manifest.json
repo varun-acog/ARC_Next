@@ -1,6 +1,11 @@
 {
-  "/page": "app/page.js",
-  "/generate/page": "app/generate/page.js",
   "/compare/page": "app/compare/page.js",
-  "/review/page": "app/review/page.js"
+  "/api/contracts/upload-reference/route": "app/api/contracts/upload-reference/route.js",
+  "/api/contracts/upload-for-review/route": "app/api/contracts/upload-for-review/route.js",
+  "/api/contracts/compare/route": "app/api/contracts/compare/route.js",
+  "/review/page": "app/review/page.js",
+  "/api/session/create/route": "app/api/session/create/route.js",
+  "/generate/page": "app/generate/page.js",
+  "/api/templates/route": "app/api/templates/route.js",
+  "/page": "app/page.js"
 }
