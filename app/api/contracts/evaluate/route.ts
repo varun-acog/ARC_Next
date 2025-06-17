@@ -58,18 +58,21 @@ export async function POST(request: Request) {
     if (!externalResponse.ok) {
       const contentType = externalResponse.headers.get('Content-Type');
       let errorMessage = 'Failed to evaluate contract via external endpoint';
-      let errorData = {};
+      let errorData: { error?: string; detail?: string; [key: string]: any } = {};
+
       if (contentType && contentType.includes('application/json')) {
         try {
           errorData = JSON.parse(responseBody);
-          errorMessage = errorData.error || errorData.detail || 'External API returned an error with no details';
-        } catch (parseError) {
+          errorMessage =
+            errorData.error || errorData.detail || 'External API returned an error with no details';
+        } catch (parseError: any) {
           console.error('Failed to parse error response as JSON:', parseError.message);
           errorMessage = 'Invalid error response from external API';
         }
       } else {
         errorMessage = `${errorMessage} (Status: ${externalResponse.status} ${externalResponse.statusText})`;
       }
+
       console.log('External endpoint error details:', errorData);
       console.log('External endpoint error:', errorMessage);
       return NextResponse.json(
@@ -81,15 +84,18 @@ export async function POST(request: Request) {
     let responseData;
     try {
       responseData = JSON.parse(responseBody);
-    } catch (parseError) {
+    } catch (parseError: any) {
       console.error('Failed to parse external response as JSON:', parseError.message);
       return NextResponse.json({ error: 'Invalid response from external API' }, { status: 500 });
     }
-    console.log('External endpoint parsed response:', responseData);
 
+    console.log('External endpoint parsed response:', responseData);
     return NextResponse.json(responseData, { status: 200 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Evaluation error:', error.message);
-    return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error', details: error.message },
+      { status: 500 }
+    );
   }
 }

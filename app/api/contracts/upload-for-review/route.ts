@@ -45,29 +45,38 @@ export async function POST(request: Request) {
     externalFormData.append('session_id', sessionId);
 
     console.log('Uploading review document to external endpoint...');
-    const externalResponse = await fetch('https://demo-legal-llm-backend-1.hpc4.aganitha.ai/api/contracts/upload-for-review', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': authHeader,
-      },
-      body: externalFormData,
-    });
+    const externalResponse = await fetch(
+      'https://demo-legal-llm-backend-1.hpc4.aganitha.ai/api/contracts/upload-for-review',
+      {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': authHeader,
+        },
+        body: externalFormData,
+      }
+    );
 
     console.log('External endpoint response status:', externalResponse.status);
+
     if (!externalResponse.ok) {
       const contentType = externalResponse.headers.get('Content-Type');
       let errorMessage = 'Failed to upload review document to external endpoint';
-      let errorData = {};
+      let errorData: { error?: string; [key: string]: any } = {};
+
       if (contentType && contentType.includes('application/json')) {
         errorData = await externalResponse.json();
         errorMessage = errorData.error || errorMessage;
       } else {
         errorMessage = `${errorMessage} (Status: ${externalResponse.status} ${externalResponse.statusText})`;
       }
+
       console.log('External endpoint error details:', errorData);
       console.log('External endpoint error:', errorMessage);
-      return NextResponse.json({ error: errorMessage, details: errorData }, { status: externalResponse.status });
+      return NextResponse.json(
+        { error: errorMessage, details: errorData },
+        { status: externalResponse.status }
+      );
     }
 
     const responseData = await externalResponse.json();
@@ -77,12 +86,15 @@ export async function POST(request: Request) {
     setSessionData(sessionId, { reviewFile: file.name });
     console.log('Upload For Review - Stored in session:', { sessionId, reviewFile: file.name });
 
-    return NextResponse.json({
-      message: 'File uploaded successfully',
-      session_id: sessionId,
-      filename: file.name,
-    }, { status: 200 });
-  } catch (error) {
+    return NextResponse.json(
+      {
+        message: 'File uploaded successfully',
+        session_id: sessionId,
+        filename: file.name,
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
     console.error('Upload error:', error.message);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

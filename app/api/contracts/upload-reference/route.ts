@@ -25,7 +25,10 @@ export async function POST(request: Request) {
     // Validate LDAP credentials
     if (!LDAP_USERNAME || !LDAP_PASSWORD) {
       console.log('Error: LDAP credentials are missing in environment variables');
-      return NextResponse.json({ error: 'LDAP credentials are missing in environment variables' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'LDAP credentials are missing in environment variables' },
+        { status: 500 }
+      );
     }
 
     // Prepare Basic Auth header: Base64 encode "username:password"
@@ -39,29 +42,37 @@ export async function POST(request: Request) {
     externalFormData.append('session_id', sessionId);
 
     console.log('Uploading reference document to external endpoint...');
-    const externalResponse = await fetch('https://demo-legal-llm-backend-1.hpc4.aganitha.ai/api/contracts/upload-reference', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': authHeader,
-      },
-      body: externalFormData,
-    });
+    const externalResponse = await fetch(
+      'https://demo-legal-llm-backend-1.hpc4.aganitha.ai/api/contracts/upload-reference',
+      {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': authHeader,
+        },
+        body: externalFormData,
+      }
+    );
 
     console.log('External endpoint response status:', externalResponse.status);
     if (!externalResponse.ok) {
       const contentType = externalResponse.headers.get('Content-Type');
       let errorMessage = 'Failed to upload reference document to external endpoint';
-      let errorData = {};
+      let errorData: { error?: string; [key: string]: any } = {};
+
       if (contentType && contentType.includes('application/json')) {
         errorData = await externalResponse.json();
         errorMessage = errorData.error || errorMessage;
       } else {
         errorMessage = `${errorMessage} (Status: ${externalResponse.status} ${externalResponse.statusText})`;
       }
+
       console.log('External endpoint error details:', errorData);
       console.log('External endpoint error:', errorMessage);
-      return NextResponse.json({ error: errorMessage, details: errorData }, { status: externalResponse.status });
+      return NextResponse.json(
+        { error: errorMessage, details: errorData },
+        { status: externalResponse.status }
+      );
     }
 
     const responseData = await externalResponse.json();
@@ -69,14 +80,20 @@ export async function POST(request: Request) {
 
     // Update the local session store with the filename
     setSessionData(sessionId, { referenceFile: file.name });
-    console.log('Upload Reference - Stored in session:', { sessionId, referenceFile: file.name });
+    console.log('Upload Reference - Stored in session:', {
+      sessionId,
+      referenceFile: file.name,
+    });
 
-    return NextResponse.json({
-      message: 'Reference document uploaded successfully',
-      session_id: sessionId,
-      filename: file.name,
-    }, { status: 200 });
-  } catch (error) {
+    return NextResponse.json(
+      {
+        message: 'Reference document uploaded successfully',
+        session_id: sessionId,
+        filename: file.name,
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
     console.error('Upload error:', error.message);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

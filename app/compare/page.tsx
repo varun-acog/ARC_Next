@@ -129,9 +129,10 @@ const CompareContract: React.FC = () => {
       setSessionId(data.session_id);
       return data.session_id;
     } catch (err) {
-      console.error('Session creation error:', err.message);
-      setError(err.message);
-      throw err;
+      const error = err as Error;
+      console.error('Session creation error:', error.message);
+      setError(error.message);
+      throw error;
     }
   };
 
@@ -160,8 +161,9 @@ const CompareContract: React.FC = () => {
         setSelectedTemplate(data.templates[0].name);
       }
     } catch (err) {
-      console.error('Templates fetch error:', err.message);
-      setError(err.message);
+      const error = err as Error;
+      console.error('Templates fetch error:', error.message);
+      setError(error.message);
     }
   };
 
@@ -237,7 +239,7 @@ const CompareContract: React.FC = () => {
           const errorData = await originalResponse.json();
           errorMessage = errorData.error || errorMessage;
         } else {
-          errorMessage = `${errorMessage} (Status: ${originalResponse.status} ${response.statusText})`;
+          errorMessage = `${errorMessage} (Status: ${originalResponse.status} ${originalResponse.statusText})`;
         }
         throw new Error(errorMessage);
       }
@@ -359,14 +361,15 @@ const CompareContract: React.FC = () => {
       console.log('Setting new changes:', mappedChanges);
       setChanges(mappedChanges);
     } catch (err) {
-      if (err.message === 'Retry with new session') {
+      const error = err as Error;
+      if (error.message === 'Retry with new session') {
         console.log('Retrying comparison with new session ID:', session_id);
         setIsComparing(false);
         await handleCompareDocuments();
         return;
       }
-      console.error('Comparison error:', err.message);
-      setError(err.message);
+      console.error('Comparison error:', error.message);
+      setError(error.message);
     } finally {
       console.log('Comparison process finished');
       setIsComparing(false);

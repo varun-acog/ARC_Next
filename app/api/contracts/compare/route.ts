@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     if (!statusResponse.ok) {
       const contentType = statusResponse.headers.get('Content-Type');
       let errorMessage = 'Failed to check session status';
-      let errorData = {};
+      let errorData: { error?: string; [key: string]: any } = {};
       if (contentType && contentType.includes('application/json')) {
         errorData = await statusResponse.json();
         errorMessage = errorData.error || errorMessage;
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     if (!externalResponse.ok) {
       const contentType = externalResponse.headers.get('Content-Type');
       let errorMessage = 'Failed to compare documents via external endpoint';
-      let errorData = {};
+      let errorData: { error?: string; [key: string]: any } = {};
       if (contentType && contentType.includes('application/json')) {
         errorData = await externalResponse.json();
         errorMessage = errorData.error || errorMessage;
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
 
     // Return the external endpoint's response directly to the frontend
     return NextResponse.json(compareResult, { status: 200 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Compare error:', error.message);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
