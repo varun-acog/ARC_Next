@@ -13,12 +13,12 @@ interface EvaluationQuestion {
 
 interface Metadata {
   template_type: string;
-  enterprise_name?: string;
-  client_name?: string;
-  effective_date?: string;
-  valid_duration?: string;
-  notice_period?: string;
-  generatedAt?: string;
+  enterprise_name: string;
+  client_name: string;
+  effective_date: string;
+  valid_duration: string;
+  notice_period: string;
+  generatedAt: string;
   analyzedAt?: string;
   session_id?: string;
   uploadedAt?: string;
@@ -76,11 +76,12 @@ const ReviewContract: React.FC = () => {
       console.log('Setting contract type from currentDocument:', currentDocument.type);
       setContractType(currentDocument.type);
       setSelectedFile(currentDocument.file || null);
-      if (currentDocument.metadata?.session_id) {
-        setSessionId(currentDocument.metadata.session_id);
+      const metadata = currentDocument.metadata as Metadata;
+      if (metadata?.session_id) {
+        setSessionId(metadata.session_id);
         setUploadResponse({
           message: 'File uploaded successfully',
-          session_id: currentDocument.metadata.session_id,
+          session_id: metadata.session_id,
           filename: currentDocument.name,
         });
       }
@@ -245,6 +246,12 @@ const ReviewContract: React.FC = () => {
         content: null,
         metadata: {
           template_type: contractType,
+          enterprise_name: '',
+          client_name: '',
+          effective_date: '',
+          valid_duration: '',
+          notice_period: '',
+          generatedAt: new Date().toISOString(),
           session_id: sessionId,
           uploadedAt: new Date().toISOString(),
         },
@@ -361,8 +368,13 @@ const ReviewContract: React.FC = () => {
           content: currentDocument?.content || null,
           metadata: {
             template_type: contractType,
+            enterprise_name: currentDocument?.metadata.enterprise_name || '',
+            client_name: currentDocument?.metadata.client_name || '',
+            effective_date: currentDocument?.metadata.effective_date || '',
+            valid_duration: currentDocument?.metadata.valid_duration || '',
+            notice_period: currentDocument?.metadata.notice_period || '',
+            generatedAt: currentDocument?.metadata.generatedAt || new Date().toISOString(),
             session_id: sessionId,
-            ...(currentDocument?.metadata || {}),
             analyzedAt: new Date().toISOString(),
           },
           file: selectedFile,
