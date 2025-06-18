@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { FileText, Scale, GitCompare, ArrowRight, CheckCircle } from 'lucide-react';
+import { FileText, Search, Scale, ArrowRight, CheckCircle } from 'lucide-react';
 
 const LandingPage: React.FC = () => {
   const features = [
@@ -12,14 +12,14 @@ const LandingPage: React.FC = () => {
       color: 'bg-blue-500'
     },
     {
-      icon: Scale,
+      icon: Search,
       title: 'Evaluate Contracts',
       description: 'Upload and analyze contracts with AI-powered evaluation and comprehensive question-based assessment.',
       link: '/review',
       color: 'bg-teal-500'
     },
     {
-      icon: GitCompare,
+      icon: Scale,
       title: 'Compare Contracts',
       description: 'Compare contract versions with detailed change tracking, AI insights, and approval workflows.',
       link: '/compare',

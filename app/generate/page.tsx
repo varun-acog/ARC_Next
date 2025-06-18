@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileText, Download, Calendar, Building, User, Clock, AlertCircle, ArrowRight } from 'lucide-react';
 import { useDocuments } from '../contexts/DocumentContext';
+import { useSession } from '../hooks/useSession';
 
 interface FormData {
   enterprise_name: string;
@@ -43,6 +44,7 @@ interface Document {
 const GenerateContract = () => {
   const router = useRouter();
   const { addDocument, setGenerateDocument } = useDocuments();
+  const { sessionId, isLoading: sessionLoading, error: sessionError } = useSession();
   const [formData, setFormData] = useState<FormData>({
     enterprise_name: '',
     client_name: '',
@@ -51,49 +53,20 @@ const GenerateContract = () => {
     notice_period: '',
     template_type: '',
   });
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedDocument, setGeneratedDocument] = useState<Document | null>(null);
 
   useEffect(() => {
-    createSession();
     fetchTemplates();
   }, []);
 
-  const createSession = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/session/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!response.ok) {
-        const contentType = response.headers.get('Content-Type');
-        let errorMessage = 'Failed to create session';
-        if (contentType?.includes('application/json')) {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } else {
-          errorMessage = `${errorMessage} (Status: ${response.status} ${response.statusText})`;
-        }
-        throw new Error(errorMessage);
-      }
-      const data = await response.json();
-      if (!data.session_id) {
-        throw new Error('Session ID not returned');
-      }
-      setSessionId(data.session_id);
-    } catch (err) {
-      const error = err as Error;
-      setError(error.message || 'An unexpected error occurred during session creation');
-      console.error('Session creation error:', error);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (sessionError) {
+      setError(sessionError);
     }
-  };
+  }, [sessionError]);
 
   const fetchTemplates = async () => {
     try {
@@ -253,6 +226,10 @@ const GenerateContract = () => {
       router.push('/review');
     }
   };
+
+  if (sessionLoading) {
+    return <div className="text-center py-8">Loading session...</div>;
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -418,10 +395,10 @@ const GenerateContract = () => {
                     <span className="font-medium text-green-800">Document Generated Successfully!</span>
                   </div>
                   <p className="text-sm text-green-700 mb-4">
-                    Your {formData.template_type} has been generated and is ready for download or review.
+                    Your {formData.template_type} has been downloaded.
                   </p>
                   <div className="flex space-x-3">
-                    <button
+                    {/* <button
                       onClick={handleDownload}
                       className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center space-x-2"
                     >
@@ -434,7 +411,7 @@ const GenerateContract = () => {
                     >
                       <ArrowRight className="w-4 h-4" />
                       <span>Review Document</span>
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               )}

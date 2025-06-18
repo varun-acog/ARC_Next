@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FileText, Scale, GitCompare } from 'lucide-react';
+import { FileText, Scale, Search } from 'lucide-react';
 import Image from 'next/image';
 
 const Header: React.FC = () => {
@@ -12,8 +12,8 @@ const Header: React.FC = () => {
   const navItems = [
     { path: '/', label: 'Home', icon: null },
     { path: '/generate', label: 'Generate Contract', icon: FileText },
-    { path: '/review', label: 'Evaluate Contract', icon: Scale },
-    { path: '/compare', label: 'Compare Contracts', icon: GitCompare },
+    { path: '/review', label: 'Evaluate Contract', icon: Search },
+    { path: '/compare', label: 'Compare Contracts', icon: Scale },
   ];
 
   return (
@@ -22,7 +22,7 @@ const Header: React.FC = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-8">
             <Link href="/" className="flex items-center space-x-3">
-              <Image
+              {/* <Image
                 src="https://www.aganitha.ai/wp-content/uploads/2023/05/aganitha-logo.png"
                 alt="Aganitha Logo"
                 width={128}
@@ -30,7 +30,7 @@ const Header: React.FC = () => {
                 className="object-contain max-h-10 w-auto"
                 quality={100}
                 priority
-              />
+              /> */}
               {/* <div className="text-xl font-bold text-blue-900">ARC Documents</div> */}
             </Link>
           </div>
